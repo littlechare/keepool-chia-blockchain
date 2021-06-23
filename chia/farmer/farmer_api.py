@@ -42,7 +42,7 @@ class FarmerAPI:
         This is a response from the harvester, for a NewChallenge. Here we check if the proof
         of space is sufficiently good, and if so, we ask for the whole proof.
         """
-        difficulty = new_proof_of_space.proof.difficulty
+        difficulty = new_proof_of_space.difficulty
         # add littlehow 如果难度是矿池设置难度，则不需要计数
         if (new_proof_of_space.sp_hash not in self.farmer.number_of_responses
                 and difficulty not in self.farmer.pool_difficulties):
@@ -119,6 +119,7 @@ class FarmerAPI:
                         new_proof_of_space.sp_hash,
                         is_eos,
                         peer.peer_node_id,
+                        new_proof_of_space.difficulty,
                     )
 
                     # The plot key is 2/2 so we need the harvester's half of the signature

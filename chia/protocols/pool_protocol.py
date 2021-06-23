@@ -69,6 +69,8 @@ class PostPartialPayload(Streamable):
     sp_hash: bytes32
     end_of_sub_slot: bool
     harvester_id: bytes32
+    difficulty: uint64
+
 
 
 @dataclass(frozen=True)

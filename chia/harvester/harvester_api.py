@@ -153,8 +153,7 @@ class HarvesterAPI:
                                         plot_info.pool_contract_puzzle_hash,
                                         plot_public_key,
                                         uint8(plot_info.prover.get_size()),
-                                        proof_xs,
-                                        difficulty
+                                        proof_xs
                                     ),
                                 )
                             )
@@ -181,6 +180,7 @@ class HarvesterAPI:
                         quality_str.hex() + str(filename.resolve()),
                         proof_of_space,
                         new_challenge.signage_point_index,
+                        new_challenge.difficulty,
                     )
                 )
             return filename, all_responses
