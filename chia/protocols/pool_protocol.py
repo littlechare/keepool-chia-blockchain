@@ -75,7 +75,7 @@ class PostPartialPayload(Streamable):
 @streamable
 class PostPartialRequest(Streamable):
     payload: PostPartialPayload
-    aggregate_signature: G2Element
+    aggregate_signature: str
 
 
 # Response in success case

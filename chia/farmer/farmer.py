@@ -13,6 +13,7 @@ import chia.server.ws_connection as ws  # lgtm [py/import-and-import-from]
 from chia.consensus.coinbase import create_puzzlehash_for_pk
 from chia.consensus.constants import ConsensusConstants
 from chia.pools.pool_config import PoolWalletConfig, load_pool_config
+from chia.pools.custom_pool_api import custom_load_pool_config
 from chia.protocols import farmer_protocol, harvester_protocol
 from chia.protocols.pool_protocol import (
     ErrorResponse,
@@ -73,9 +74,16 @@ class Farmer:
         self.config = farmer_config
         # Keep track of all sps, keyed on challenge chain signage point hash
         self.sps: Dict[bytes32, List[farmer_protocol.NewSignagePoint]] = {}
+        # add littlehow, keyed on custom challenge signage point hash
+        self.custom_sps: Dict[bytes32, List[farmer_protocol.NewSignagePoint]] = {}
+        self.sp_count = 0
+        self.frequency = 12
+        self.max_difficulty = 200
 
         # Keep track of harvester plot identifier (str), target sp index, and PoSpace for each challenge
         self.proofs_of_space: Dict[bytes32, List[Tuple[str, ProofOfSpace]]] = {}
+        # add littlehow
+        self.custom_proofs_of_space: Dict[bytes32, List[Tuple[str, ProofOfSpace]]] = {}
 
         # Quality string to plot identifier and challenge_hash, for use with harvester.RequestSignatures
         self.quality_str_to_identifiers: Dict[bytes32, Tuple[str, bytes32, bytes32, bytes32]] = {}
@@ -130,7 +138,7 @@ class Farmer:
 
         # From p2_singleton_puzzle_hash to pool state dict
         self.pool_state: Dict[bytes32, Dict] = {}
-
+        self.pool_difficulties: List[uint64] = []
         # From public key bytes to PrivateKey
         self.authentication_keys: Dict[bytes, PrivateKey] = {}
 
@@ -306,7 +314,7 @@ class Farmer:
         return None
 
     async def update_pool_state(self):
-        pool_config_list: List[PoolWalletConfig] = load_pool_config(self._root_path)
+        pool_config_list: List[PoolWalletConfig] = custom_load_pool_config(self._root_path)
         for pool_config in pool_config_list:
             p2_singleton_puzzle_hash = pool_config.p2_singleton_puzzle_hash
 
@@ -314,9 +322,10 @@ class Farmer:
                 authentication_sk: Optional[PrivateKey] = await find_authentication_sk(
                     self.all_root_sks, pool_config.authentication_public_key
                 )
-                if authentication_sk is None:
-                    self.log.error(f"Could not find authentication sk for pk: {pool_config.authentication_public_key}")
-                    continue
+                # add annotation littlehow to not check
+                #if authentication_sk is None:
+                #    self.log.error(f"Could not find authentication sk for pk: {pool_config.authentication_public_key}")
+                #    continue
                 if p2_singleton_puzzle_hash not in self.pool_state:
                     self.authentication_keys[bytes(pool_config.authentication_public_key)] = authentication_sk
                     self.pool_state[p2_singleton_puzzle_hash] = {
@@ -334,7 +343,7 @@ class Farmer:
                     self.log.info(f"Added pool: {pool_config}")
                 pool_state = self.pool_state[p2_singleton_puzzle_hash]
                 pool_state["pool_config"] = pool_config
-
+                self.log.info(f"current-pool-config-url {pool_config.pool_url}")
                 # Skip state update when self pooling
                 if pool_config.pool_url == "":
                     continue
@@ -349,50 +358,11 @@ class Farmer:
                         # Only update the first time from GET /pool_info, gets updated from GET /farmer later
                         if pool_state["current_difficulty"] is None:
                             pool_state["current_difficulty"] = pool_info["minimum_difficulty"]
-
-                if time.time() >= pool_state["next_farmer_update"]:
-                    authentication_token_timeout = pool_state["authentication_token_timeout"]
-
-                    async def update_pool_farmer_info() -> Optional[dict]:
-                        # Run a GET /farmer to see if the farmer is already known by the pool
-                        response = await self._pool_get_farmer(
-                            pool_config, authentication_token_timeout, authentication_sk
-                        )
-                        if response is not None and "error_code" not in response:
-                            farmer_info: GetFarmerResponse = GetFarmerResponse.from_json_dict(response)
-                            pool_state["current_difficulty"] = farmer_info.current_difficulty
-                            pool_state["current_points"] = farmer_info.current_points
-                            pool_state["next_farmer_update"] = time.time() + UPDATE_POOL_FARMER_INFO_INTERVAL
-                        return response
-
-                    if authentication_token_timeout is not None:
-                        update_response = await update_pool_farmer_info()
-                        is_error = update_response is not None and "error_code" in update_response
-                        if is_error and update_response["error_code"] == PoolErrorCode.FARMER_NOT_KNOWN.value:
-                            # Make the farmer known on the pool with a POST /farmer
-                            owner_sk = await find_owner_sk(self.all_root_sks, pool_config.owner_public_key)
-                            post_response = await self._pool_post_farmer(
-                                pool_config, authentication_token_timeout, owner_sk
-                            )
-                            if post_response is not None and "error_code" not in post_response:
-                                self.log.info(
-                                    f"Welcome message from {pool_config.pool_url}: "
-                                    f"{post_response['welcome_message']}"
-                                )
-                                # Now we should be able to update the local farmer info
-                                update_response = await update_pool_farmer_info()
-                                if update_response is not None and "error_code" in update_response:
-                                    self.log.error(
-                                        f"Failed to update farmer info after POST /farmer: "
-                                        f"{update_response['error_code']}, "
-                                        f"{update_response['error_message']}"
-                                    )
-                    else:
-                        self.log.warning(
-                            f"No pool specific authentication_token_timeout has been set for {p2_singleton_puzzle_hash}"
-                            f", check communication with the pool."
-                        )
-
+                            self.pool_difficulties.append(pool_info["minimum_difficulty"])
+                        if pool_info["frequency"] is not None:
+                            self.frequency = pool_info["frequency"]
+                        if pool_info["max_difficulty"] is not None:
+                            self.max_difficulty = pool_info["max_difficulty"]
             except Exception as e:
                 tb = traceback.format_exc()
                 self.log.error(f"Exception in update_pool_state for {pool_config.pool_url}, {e} {tb}")
@@ -529,7 +499,9 @@ class Farmer:
                 for key, add_time in self.cache_add_time.items():
                     if now - float(add_time) > self.constants.SUB_SLOT_TIME_TARGET * 3:
                         self.sps.pop(key, None)
+                        self.custom_sps.pop(key, None)
                         self.proofs_of_space.pop(key, None)
+                        self.custom_proofs_of_space.pop(key, None)
                         self.quality_str_to_identifiers.pop(key, None)
                         self.number_of_responses.pop(key, None)
                         removed_keys.append(key)

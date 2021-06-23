@@ -154,6 +154,7 @@ class HarvesterAPI:
                                         plot_public_key,
                                         uint8(plot_info.prover.get_size()),
                                         proof_xs,
+                                        difficulty
                                     ),
                                 )
                             )

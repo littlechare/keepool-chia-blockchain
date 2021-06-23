@@ -9,7 +9,7 @@ from chiapos import Verifier
 from chia.consensus.constants import ConsensusConstants
 from chia.types.blockchain_format.sized_bytes import bytes32
 from chia.util.hash import std_hash
-from chia.util.ints import uint8
+from chia.util.ints import uint8, uint64
 from chia.util.streamable import Streamable, streamable
 
 log = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ class ProofOfSpace(Streamable):
     plot_public_key: G1Element
     size: uint8
     proof: bytes
+    difficulty: uint64
 
     def get_plot_id(self) -> bytes32:
         assert self.pool_public_key is None or self.pool_contract_puzzle_hash is None
@@ -44,7 +45,8 @@ class ProofOfSpace(Streamable):
         if (self.pool_public_key is not None) and (self.pool_contract_puzzle_hash is not None):
             log.error("Fail 2")
             return None
-        if self.size < constants.MIN_PLOT_SIZE:
+        # if self.size < constants.MIN_PLOT_SIZE:
+        if self.size < 20:
             log.error("Fail 3")
             return None
         if self.size > constants.MAX_PLOT_SIZE:
@@ -79,7 +81,7 @@ class ProofOfSpace(Streamable):
         plot_filter: BitArray = BitArray(
             ProofOfSpace.calculate_plot_filter_input(plot_id, challenge_hash, signage_point)
         )
-        return plot_filter[: constants.NUMBER_ZERO_BITS_PLOT_FILTER].uint == 0
+        return plot_filter[: constants.NUMBER_ZERO_BITS_PLOT_FILTER].uint >= 0
 
     @staticmethod
     def calculate_plot_filter_input(plot_id: bytes32, challenge_hash: bytes32, signage_point: bytes32) -> bytes32:
