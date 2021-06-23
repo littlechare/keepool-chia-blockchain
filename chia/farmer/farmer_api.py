@@ -456,7 +456,7 @@ class FarmerAPI:
             return
 
         self.farmer.sps[new_signage_point.challenge_chain_sp].append(new_signage_point)
-        self.farmer.custom_sps[new_signage_point.challenge_chain_sp].append(new_signage_point)
+        # self.farmer.custom_sps[new_signage_point.challenge_chain_sp].append(new_signage_point)
         self.farmer.cache_add_time[new_signage_point.challenge_chain_sp] = uint64(int(time.time()))
         self.farmer.state_changed("new_signage_point", {"sp_hash": new_signage_point.challenge_chain_sp})
 

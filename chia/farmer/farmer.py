@@ -75,7 +75,7 @@ class Farmer:
         # Keep track of all sps, keyed on challenge chain signage point hash
         self.sps: Dict[bytes32, List[farmer_protocol.NewSignagePoint]] = {}
         # add littlehow, keyed on custom challenge signage point hash
-        self.custom_sps: Dict[bytes32, List[farmer_protocol.NewSignagePoint]] = {}
+        # self.custom_sps: Dict[bytes32, List[farmer_protocol.NewSignagePoint]] = {}
         self.sp_count = 0
         self.frequency = 12
         self.max_difficulty = 200
@@ -83,7 +83,7 @@ class Farmer:
         # Keep track of harvester plot identifier (str), target sp index, and PoSpace for each challenge
         self.proofs_of_space: Dict[bytes32, List[Tuple[str, ProofOfSpace]]] = {}
         # add littlehow
-        self.custom_proofs_of_space: Dict[bytes32, List[Tuple[str, ProofOfSpace]]] = {}
+        # self.custom_proofs_of_space: Dict[bytes32, List[Tuple[str, ProofOfSpace]]] = {}
 
         # Quality string to plot identifier and challenge_hash, for use with harvester.RequestSignatures
         self.quality_str_to_identifiers: Dict[bytes32, Tuple[str, bytes32, bytes32, bytes32]] = {}
@@ -499,9 +499,9 @@ class Farmer:
                 for key, add_time in self.cache_add_time.items():
                     if now - float(add_time) > self.constants.SUB_SLOT_TIME_TARGET * 3:
                         self.sps.pop(key, None)
-                        self.custom_sps.pop(key, None)
+                        # self.custom_sps.pop(key, None)
                         self.proofs_of_space.pop(key, None)
-                        self.custom_proofs_of_space.pop(key, None)
+                        # self.custom_proofs_of_space.pop(key, None)
                         self.quality_str_to_identifiers.pop(key, None)
                         self.number_of_responses.pop(key, None)
                         removed_keys.append(key)
