@@ -45,8 +45,7 @@ class ProofOfSpace(Streamable):
         if (self.pool_public_key is not None) and (self.pool_contract_puzzle_hash is not None):
             log.error("Fail 2")
             return None
-        # if self.size < constants.MIN_PLOT_SIZE:
-        if self.size < 20:
+        if self.size < constants.MIN_PLOT_SIZE:
             log.error("Fail 3")
             return None
         if self.size > constants.MAX_PLOT_SIZE:
@@ -81,7 +80,7 @@ class ProofOfSpace(Streamable):
         plot_filter: BitArray = BitArray(
             ProofOfSpace.calculate_plot_filter_input(plot_id, challenge_hash, signage_point)
         )
-        return plot_filter[: constants.NUMBER_ZERO_BITS_PLOT_FILTER].uint >= 0
+        return plot_filter[: constants.NUMBER_ZERO_BITS_PLOT_FILTER].uint == 0
 
     @staticmethod
     def calculate_plot_filter_input(plot_id: bytes32, challenge_hash: bytes32, signage_point: bytes32) -> bytes32:
